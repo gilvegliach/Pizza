@@ -1,0 +1,27 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        // Uberjar in build/libs
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.3'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'com.github.johnrengelman.shadow'
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    testCompile 'junit:junit:4.12'
+    testCompile 'org.mockito:mockito-core:1.9.5'
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'zal.Main'
+    }
+}
