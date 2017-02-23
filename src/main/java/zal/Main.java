@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 
 public class Main {
 
-  static final int[] SUBPIZZA_THRESHOLDS = new int[]{16, 24, 32, 54, 58};
+  static final int[] SUBPIZZA_THRESHOLDS = new int[]{16, 24, 32, 54, 80};
 
   public static void main(String[] args) throws Exception {
     Scanner sc = new Scanner(System.in);
@@ -31,43 +31,63 @@ public class Main {
 
     long before = System.currentTimeMillis();
     int t = threshold((float) l / h);
+    Res res = new Res();
+
+    solution(res, r, c, l, h, pizza, es, t);
+    for (Slice slice : res.slices) {
+      flip(pizza, slice.r1, slice.c1, slice.r2, slice.c2);
+    }
+    long after = System.currentTimeMillis();
+    long delta = (after - before) / 1000;
+
+    System.err.println("Step: 1/2");
+    System.err.println("Time: " + delta + " sec");
+    System.err.println("Threshold: " + t);
+
+    t *= 16;
+    solution(res, r, c, l, h ,pizza, es, t);
+
+    after = System.currentTimeMillis();
+    delta = (after - before) / 1000;
+
+    es.shutdownNow();
+
+    int score = print(res);
+    int size = r * c;
+    System.err.println("---------------");
+    System.err.println("Step: 2/2");
+    System.err.println("Time: " + delta + " sec");
+    System.err.println("Threshold: " + t);
+    System.err.println("Score: " + score + "/" + size);
+  }
+
+  static void solution(Res result, int r, int c, int l, int h, int[][] pizza, ExecutorService es, int t) throws InterruptedException, ExecutionException {
     List<Slice> slices = new LinkedList<>();
     split(slices, t, new Slice(0, 0, r - 1, c - 1));
 
     List<Future<Res>> futureResults = new LinkedList<>();
     for (final Slice slice : slices) {
-      Future<Res> futureResult = es.submit(() -> solution(l, h, slice, pizza));
+      Future<Res> futureResult = es.submit(() -> backtracking(l, h, slice, pizza));
       futureResults.add(futureResult);
     }
 
-    Res res = new Res();
     for (Future<Res> futureResult : futureResults) {
       Res partialRes = futureResult.get();
-      res.n += partialRes.n;
-      res.slices.addAll(partialRes.slices);
-      res.area += partialRes.area;
+      result.n += partialRes.n;
+      result.slices.addAll(partialRes.slices);
+      result.area += partialRes.area;
     }
-    long after = System.currentTimeMillis();
-    es.shutdownNow();
-
-    int score = print(res);
-    long delta = (after - before) / 1000;
-    int size = r * c;
-    System.err.println("---------------");
-    System.err.println("Time: " + delta + "sec");
-    System.err.println("Threshold: " + t);
-    System.err.println("Score: " + score + "/" + size);
   }
 
 
-  static Res solutionRec(int l, int h, List<Slice> slices, int pos, int[][] pizza) {
+  static Res backtrackingRec(int l, int h, List<Slice> slices, int pos, int[][] pizza) {
     Res res = new Res();
     int n = slices.size();
     for (int i = pos; i < n; i++) {
       Slice slice = slices.get(i);
       if (isValid(l, h, pizza, slice.r1, slice.c1, slice.r2, slice.c2)) {
         flip(pizza, slice.r1, slice.c1, slice.r2, slice.c2);
-        Res partialRes = solutionRec(l, h, slices, i + 1, pizza);
+        Res partialRes = backtrackingRec(l, h, slices, i + 1, pizza);
         int area = slice.area() * partialRes.area;
         if (res.area < area) {
           partialRes.area = area;
@@ -81,12 +101,19 @@ public class Main {
     return res;
   }
 
-  static Res solution(int l, int h, Slice root, int[][] pizza) {
+  static Res backtracking(int l, int h, Slice root, int[][] pizza) {
     List<Slice> slices = new LinkedList<>();
     for (int i = root.r1; i <= root.r2; i++) {
       for (int j = root.c1; j <= root.c2; j++) {
-        for (int p = i; p <= root.r2; p++) {
-          for (int q = j; q <= root.c2; q++) {
+        if (pizza[i][j] < 0) continue;
+        int pLimit = Math.min(root.r2, i + h);
+        int qLimit = Math.min(root.c2, j + h);
+        for (int p = i; p <= pLimit; p++) {
+          for (int q = j; q <= qLimit; q++) {
+            if (pizza[i][j] < 0) {
+              qLimit = q - 1;
+              break;
+            }
             int area = area(i, j, p, q);
             if (area > h || area < 2 * l) continue;
             slices.add(new Slice(i, j, p, q));
@@ -94,7 +121,7 @@ public class Main {
         }
       }
     }
-    return solutionRec(l, h, slices, 0, pizza);
+    return backtrackingRec(l, h, slices, 0, pizza);
   }
 
   static int print(Res res) {
