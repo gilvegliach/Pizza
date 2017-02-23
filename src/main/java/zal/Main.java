@@ -31,10 +31,10 @@ public class Main {
 
     long before = System.currentTimeMillis();
     int t = threshold((float) l / h);
-    List<Slice> slices = new ArrayList<>();
+    List<Slice> slices = new LinkedList<>();
     split(slices, t, new Slice(0, 0, r - 1, c - 1));
 
-    List<Future<Res>> futureResults = new ArrayList<>();
+    List<Future<Res>> futureResults = new LinkedList<>();
     for (final Slice slice : slices) {
       Future<Res> futureResult = es.submit(() -> solution(l, h, slice, pizza));
       futureResults.add(futureResult);
@@ -59,30 +59,42 @@ public class Main {
     System.err.println("Score: " + score + "/" + size);
   }
 
-  static Res solution(int l, int h, Slice slice, int[][] pizza) {
+
+  static Res solutionRec(int l, int h, List<Slice> slices, int pos, int[][] pizza) {
     Res res = new Res();
-    for (int i = slice.r1; i <= slice.r2; i++) {
-      for (int j = slice.c1; j <= slice.c2; j++) {
-        if (pizza[i][j] <= 0) continue;
-        for (int p = i; p <= slice.r2; p++) {
-          for (int q = j; q <= slice.c2; q++) {
-            if (isValid(l, h, pizza, i, j, p, q)) {
-              flip(pizza, i, j, p, q);
-              Res partialRes = solution(l, h, slice, pizza);
-              int area = area(i, j, p, q) * partialRes.area;
-              if (res.area < area) {
-                partialRes.area = area;
-                partialRes.n++;
-                partialRes.slices.add(0, new Slice(i, j, p, q));
-                res = partialRes;
-              }
-              flip(pizza, i, j, p, q);
-            }
+    int n = slices.size();
+    for (int i = pos; i < n; i++) {
+      Slice slice = slices.get(i);
+      if (isValid(l, h, pizza, slice.r1, slice.c1, slice.r2, slice.c2)) {
+        flip(pizza, slice.r1, slice.c1, slice.r2, slice.c2);
+        Res partialRes = solutionRec(l, h, slices, i + 1, pizza);
+        int area = slice.area() * partialRes.area;
+        if (res.area < area) {
+          partialRes.area = area;
+          partialRes.n++;
+          partialRes.slices.add(0, slice);
+          res = partialRes;
+        }
+        flip(pizza, slice.r1, slice.c1, slice.r2, slice.c2);
+      }
+    }
+    return res;
+  }
+
+  static Res solution(int l, int h, Slice root, int[][] pizza) {
+    List<Slice> slices = new LinkedList<>();
+    for (int i = root.r1; i <= root.r2; i++) {
+      for (int j = root.c1; j <= root.c2; j++) {
+        for (int p = i; p <= root.r2; p++) {
+          for (int q = j; q <= root.c2; q++) {
+            int area = area(i, j, p, q);
+            if (area > h || area < 2 * l) continue;
+            slices.add(new Slice(i, j, p, q));
           }
         }
       }
     }
-    return res;
+    return solutionRec(l, h, slices, 0, pizza);
   }
 
   static int print(Res res) {
@@ -126,8 +138,6 @@ public class Main {
   }
 
   static boolean isValid(int l, int h, int[][] pizza, int i, int j, int p, int q) {
-    int n = (p - i + 1) * (q - j + 1);
-    if (n > h || n < 2 * l) return false;
     int t = 0;
     int m = 0;
     for (int ii = i; ii <= p; ii++) {
